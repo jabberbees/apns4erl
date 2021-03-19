@@ -34,11 +34,8 @@
 %% Signs the given binary.
 -spec sign(binary(), string()) -> binary().
 sign(Data, KeyPath) ->
-  Command = "printf '" ++
-            binary_to_list(Data) ++
-            "' | openssl dgst -binary -sha256 -sign " ++ KeyPath ++ " | base64",
-  {0, Result} = apns_os:cmd(Command),
-  strip_b64(list_to_binary(Result)).
+  SigningMethod = application:get_env(apns, token_signing_method, public_key),
+  sign(SigningMethod, Data, KeyPath).
 
 %% Retrieves the epoch date.
 -spec epoch() -> integer().
@@ -66,3 +63,18 @@ seconds_to_timestamp(Secs) ->
 -spec strip_b64(binary()) -> binary().
 strip_b64(BS) ->
   binary:list_to_bin(binary:split(BS, [<<"\n">>, <<"=">>], [global])).
+
+%% Signs the given binary using openssl or Erlang OTP's public_key
+-spec sign(atom(), binary(), string()) -> binary().
+sign(openssl, Data, KeyPath) ->
+  Command = "printf '" ++
+            binary_to_list(Data) ++
+            "' | openssl dgst -binary -sha256 -sign " ++ KeyPath ++ " | base64",
+  {0, Result} = apns_os:cmd(Command),
+  strip_b64(list_to_binary(Result));
+
+sign(public_key, Data, KeyPath) ->
+  {ok, PemBin} = file:read_file(KeyPath),
+  [KeyEntry] = public_key:pem_decode(PemBin),
+  PrivateKey = public_key:pem_entry_decode(KeyEntry),
+  base64:encode(public_key:sign(Data, sha256, PrivateKey)).
