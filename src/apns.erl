@@ -149,13 +149,19 @@ push_notification_token(ConnectionId, Token, DeviceId, JSONMap, Headers) ->
                                    , Notification
                                    , Headers
                                    ).
+
 -spec generate_token(binary(), binary()) -> token().
 generate_token(TeamId, KeyId) ->
-  {ok, KeyPath} = application:get_env(apns, token_keyfile),
-  generate_token(TeamId, KeyId, KeyPath).
+  Method = application:get_env(apns, token_signing_method, public_key),
+  Openssl = application:get_env(apns, token_openssl, "openssl"),
+  {ok, KeyFile} = application:get_env(apns, token_keyfile),
+  generate_token(TeamId, KeyId, #{ method => Method
+                                 , openssl => Openssl
+                                 , keyfile => KeyFile
+                                 }).
 
--spec generate_token(binary(), binary(), string()) -> token().
-generate_token(TeamId, KeyId, KeyPath) ->
+-spec generate_token(binary(), binary(), apns_utils:sign_opts()) -> token().
+generate_token(TeamId, KeyId, SignOpts) ->
   Algorithm = <<"ES256">>,
   Header = jsx:encode([ {alg, Algorithm}
                       , {typ, <<"JWT">>}
@@ -167,7 +173,7 @@ generate_token(TeamId, KeyId, KeyPath) ->
   HeaderEncoded = base64url:encode(Header),
   PayloadEncoded = base64url:encode(Payload),
   DataEncoded = <<HeaderEncoded/binary, $., PayloadEncoded/binary>>,
-  Signature = apns_utils:sign(DataEncoded, KeyPath),
+  Signature = apns_utils:sign(DataEncoded, SignOpts),
   <<DataEncoded/binary, $., Signature/binary>>.
 
 %% @doc Get the default headers from environment variables.
