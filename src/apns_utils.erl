@@ -39,13 +39,13 @@
 
 %% Signs the given binary.
 -spec sign(binary(), sign_opts()) -> binary().
-sign(Data, #{ method := openssl, openssl := Openssl, key := KeyFile }) ->
+sign(Data, #{ method := openssl, openssl := Openssl, keyfile := KeyFile }) ->
   Command = "printf '" ++ binary_to_list(Data) ++ "'" ++
             " | " ++ Openssl ++ " dgst -binary -sha256 -sign " ++ KeyFile ++
             " | base64",
   {0, Result} = apns_os:cmd(Command),
   strip_b64(list_to_binary(Result));
-sign(Data, #{ method := public_key, key := KeyFile }) ->
+sign(Data, #{ method := public_key, keyfile := KeyFile }) ->
   {ok, PemBin} = file:read_file(KeyFile),
   [KeyEntry] = public_key:pem_decode(PemBin),
   PrivateKey = public_key:pem_entry_decode(KeyEntry),
